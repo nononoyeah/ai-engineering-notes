@@ -6,6 +6,7 @@ from backend.app.document_parser.pdf_parser import (
     open_pdf_document,
 )
 from backend.app.document_parser.pdf_parser import extract_pdf_content
+from unittest.mock import patch
 
 
 def create_test_pdf(path):
@@ -118,3 +119,31 @@ def test_extract_pdf_content_rejects_image_only_pdf(tmp_path):
         match="没有可提取的文本内容",
     ):
         extract_pdf_content(pdf_path)
+
+
+def test_extract_pdf_content_reports_page_extraction_error(tmp_path):
+    pdf_path = tmp_path / "error_page.pdf"
+    create_multi_page_pdf(pdf_path)
+
+    original_load_page = pymupdf.Document.load_page
+
+    def mock_load_page(document, page_index, *args, **kwargs):
+        if page_index == 1:
+            raise RuntimeError("模拟第二页读取失败")
+
+        return original_load_page(
+            document,
+            page_index,
+            *args,
+            **kwargs,
+        )
+
+    with patch(
+        "pymupdf.Document.load_page",
+        new=mock_load_page,
+    ):
+        with pytest.raises(
+            PDFDocumentError,
+            match="第 2 页提取失败",
+        ):
+            extract_pdf_content(pdf_path)

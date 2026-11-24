@@ -58,6 +58,7 @@ def extract_pdf_content(
 
     页码从 1 开始，并保留原始页面顺序。
     空白页会保留，但全文无有效文本时抛出异常。
+    单页提取失败时抛出明确异常，不返回不完整结果。
     """
     path = Path(pdf_path)
     document = open_pdf_document(path)
@@ -67,15 +68,22 @@ def extract_pdf_content(
         has_text = False
 
         for page_index in range(document.page_count):
-            page = document.load_page(page_index)
-            text = page.get_text("text")
+            page_number = page_index + 1
+
+            try:
+                page = document.load_page(page_index)
+                text = page.get_text("text")
+            except Exception as exc:
+                raise PDFDocumentError(
+                    f"PDF 第 {page_number} 页提取失败：{exc}"
+                ) from exc
 
             if text.strip():
                 has_text = True
 
             pages.append(
                 PageContent(
-                    page_number=page_index + 1,
+                    page_number=page_number,
                     text=text,
                 )
             )
