@@ -1,0 +1,50 @@
+from backend.app.document_parser.models import (
+    DocumentContent,
+    PageContent,
+)
+
+
+def test_document_content_with_single_page():
+    page = PageContent(
+        page_number=1,
+        text="第一页内容",
+    )
+
+    document = DocumentContent(
+        filename="example.pdf",
+        total_pages=1,
+        pages=[page],
+    )
+
+    assert document.filename == "example.pdf"
+    assert document.total_pages == 1
+    assert len(document.pages) == 1
+    assert document.pages[0].page_number == 1
+    assert document.pages[0].text == "第一页内容"
+
+
+def test_document_content_with_multiple_pages():
+    document = DocumentContent(
+        filename="example.pdf",
+        total_pages=3,
+        pages=[
+            PageContent(1, "第一页"),
+            PageContent(2, ""),
+            PageContent(3, "第三页"),
+        ],
+    )
+
+    assert document.total_pages == 3
+    assert len(document.pages) == 3
+    assert document.pages[1].text == ""
+    assert document.pages[2].page_number == 3
+
+
+def test_document_content_default_pages_are_independent():
+    first = DocumentContent(filename="a.pdf", total_pages=0)
+    second = DocumentContent(filename="b.pdf", total_pages=0)
+
+    first.pages.append(PageContent(1, "内容"))
+
+    assert len(first.pages) == 1
+    assert len(second.pages) == 0
