@@ -1,6 +1,6 @@
 import json
 
-from backend.app.document_parser.exporters import export_to_json
+from backend.app.document_parser.exporters import export_to_json, export_to_txt
 from backend.app.document_parser.models import DocumentContent, PageContent
 
 
@@ -42,3 +42,47 @@ def test_export_to_json_preserves_structure_and_chinese(tmp_path):
 
     assert data["pages"][1]["page_number"] == 2
     assert data["pages"][1]["text"] == "第二页原始内容"
+
+
+def test_export_to_txt_preserves_page_order_and_markers(tmp_path):
+    document = DocumentContent(
+        filename="测试文档.pdf",
+        total_pages=3,
+        pages=[
+            PageContent(
+                page_number=1,
+                text="第一页原始内容",
+                cleaned_text="第一页清洗内容",
+            ),
+            PageContent(
+                page_number=2,
+                text="",
+                cleaned_text="",
+            ),
+            PageContent(
+                page_number=3,
+                text="第三页原始内容",
+                cleaned_text="第三页清洗内容",
+            ),
+        ],
+    )
+
+    output_path = tmp_path / "测试文档.txt"
+
+    result = export_to_txt(document, output_path)
+
+    assert result == output_path
+    assert output_path.exists()
+
+    content = output_path.read_text(encoding="utf-8")
+
+    assert "第 1 页" in content
+    assert "第 2 页" in content
+    assert "第 3 页" in content
+
+    assert content.index("第 1 页") < content.index("第 2 页")
+    assert content.index("第 2 页") < content.index("第 3 页")
+
+    assert "第一页清洗内容" in content
+    assert "第三页清洗内容" in content
+    assert "第一页原始内容" not in content
