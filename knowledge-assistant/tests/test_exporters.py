@@ -1,6 +1,10 @@
 import json
 
-from backend.app.document_parser.exporters import export_to_json, export_to_txt
+from backend.app.document_parser.exporters import (
+    export_to_json,
+    export_to_txt,
+    export_document,
+)
 from backend.app.document_parser.models import DocumentContent, PageContent
 
 
@@ -86,3 +90,39 @@ def test_export_to_txt_preserves_page_order_and_markers(tmp_path):
     assert "第一页清洗内容" in content
     assert "第三页清洗内容" in content
     assert "第一页原始内容" not in content
+
+
+def test_export_document_creates_directory_and_both_files(tmp_path):
+    document = DocumentContent(
+        filename="项目资料.pdf",
+        total_pages=2,
+        pages=[
+            PageContent(
+                page_number=1,
+                text="第一页原始内容",
+                cleaned_text="第一页清洗内容",
+            ),
+            PageContent(
+                page_number=2,
+                text="第二页原始内容",
+                cleaned_text="第二页清洗内容",
+            ),
+        ],
+    )
+
+    output_dir = tmp_path / "nested" / "output"
+
+    result = export_document(document, output_dir)
+
+    assert output_dir.exists()
+    assert result["json"].name == "项目资料.json"
+    assert result["txt"].name == "项目资料.txt"
+    assert result["json"].exists()
+    assert result["txt"].exists()
+
+    json_data = json.loads(result["json"].read_text(encoding="utf-8"))
+    txt_content = result["txt"].read_text(encoding="utf-8")
+
+    assert json_data["filename"] == "项目资料.pdf"
+    assert "第一页清洗内容" in txt_content
+    assert "第二页清洗内容" in txt_content

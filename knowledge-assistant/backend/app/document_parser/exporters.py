@@ -58,3 +58,32 @@ def export_to_txt(
         file.write(content)
 
     return path
+
+
+def export_document(
+    document: DocumentContent,
+    output_dir: str | Path,
+) -> dict[str, Path]:
+    """
+    将文档解析结果同时导出为 TXT 和 JSON。
+
+    自动创建输出目录，并根据原始文件名生成输出文件名。
+    """
+    directory = Path(output_dir)
+    directory.mkdir(parents=True, exist_ok=True)
+
+    filename = Path(document.filename).stem
+
+    json_path = directory / f"{filename}.json"
+    txt_path = directory / f"{filename}.txt"
+
+    export_to_json(document, json_path)
+    export_to_txt(document, txt_path)
+
+    return {
+        "json": json_path,
+        "txt": txt_path,
+    }
+    
+    
+
