@@ -140,3 +140,99 @@ python -m pytest tests/test_pdf_parser.py tests/test_text_cleaner.py -v
 3. 当前只进行基础格式清洗，不进行语义纠错。
 4. 暂未实现 TXT 和 JSON 文件导出。
 5. 暂未实现文本分块（Chunk）。
+
+
+
+## 9. 文件导出
+
+### 9.1 支持的导出格式
+
+模块支持将 PDF 解析结果导出为 JSON 和 TXT：
+
+| 格式 | 导出内容 | 用途 |
+|---|---|---|
+| JSON | 文件名、总页数、逐页页码、原始文本、清洗后文本 | 保留完整解析信息，便于程序读取 |
+| TXT | 逐页清洗后的文本及页码分隔标记 | 便于阅读及后续知识库文本处理 |
+
+### 9.2 导出接口
+
+导出模块位于 `exporters.py`。
+
+**JSON 导出：**
+
+```python
+export_to_json(document, output_path)
+```
+
+将解析结果导出为 JSON 文件，使用 UTF-8 编码并保留中文。
+
+**TXT 导出：**
+
+```python
+export_to_txt(document, output_path)
+```
+
+按照原始页序导出清洗后的文本，每页使用页码标记分隔。
+
+**统一导出：**
+
+```python
+export_document(document, output_dir)
+```
+
+同时生成 JSON 和 TXT 文件，自动创建输出目录，并根据原始 PDF 文件名生成文件名。
+
+例如，原始文件为 `项目资料.pdf`，输出目录为 `output/`，则生成：
+
+```text
+output/
+├── 项目资料.json
+└── 项目资料.txt
+```
+
+统一导出接口返回包含两个文件路径的字典：
+
+```python
+{
+    "json": json_path,
+    "txt": txt_path
+}
+```
+
+### 9.3 完整调用示例
+
+```python
+from backend.app.document_parser.pdf_parser import extract_pdf_content
+from backend.app.document_parser.exporters import export_document
+
+document = extract_pdf_content("example.pdf")
+
+result = export_document(document, "output")
+
+print("JSON 文件：", result["json"])
+print("TXT 文件：", result["txt"])
+```
+
+### 9.4 异常处理
+
+导出失败时抛出 `ExportError`，目前覆盖：
+
+- 输出目录创建失败。
+- JSON 文件写入失败。
+- TXT 文件写入失败。
+
+调用方可以统一捕获：
+
+```python
+from backend.app.document_parser.exporters import (
+    export_document,
+    ExportError,
+)
+
+try:
+    result = export_document(document, "output")
+except ExportError as exc:
+    print(f"文档导出失败：{exc}")
+```
+
+注意：`export_to_json` 和 `export_to_txt` 是底层独立导出接口，不负责自动创建父目录；需要自动创建目录时，建议使用 `export_document`。
