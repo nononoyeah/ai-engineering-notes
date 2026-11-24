@@ -147,3 +147,47 @@ def test_extract_pdf_content_reports_page_extraction_error(tmp_path):
             match="第 2 页提取失败",
         ):
             extract_pdf_content(pdf_path)
+
+
+def test_extract_pdf_content_preserves_original_and_cleaned_text(tmp_path):
+    pdf_path = tmp_path / "cleaning_test.pdf"
+
+    document = pymupdf.open()
+
+    page1 = document.new_page()
+    page1.insert_text(
+        (72, 72),
+        "First    page",
+    )
+
+    # 第二页保留为空白页
+    document.new_page()
+
+    page3 = document.new_page()
+    page3.insert_text(
+        (72, 72),
+        "Third    page",
+    )
+
+    document.save(pdf_path)
+    document.close()
+
+    result = extract_pdf_content(pdf_path)
+
+    assert result.total_pages == 3
+    assert len(result.pages) == 3
+
+    # 第一页：原始文本与清洗文本分别保存
+    assert result.pages[0].page_number == 1
+    assert "First" in result.pages[0].text
+    assert "First page" in result.pages[0].cleaned_text
+
+    # 第二页：空白页仍然保留
+    assert result.pages[1].page_number == 2
+    assert result.pages[1].cleaned_text == ""
+
+    # 第三页：清洗结果仍对应第三页
+    assert result.pages[2].page_number == 3
+    assert "Third" in result.pages[2].text
+    assert "Third page" in result.pages[2].cleaned_text
+    

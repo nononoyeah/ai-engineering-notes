@@ -7,6 +7,7 @@ class PageContent:
 
     page_number: int
     text: str
+    cleaned_text: str = ""
 
 
 @dataclass

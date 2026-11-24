@@ -6,6 +6,7 @@ from backend.app.document_parser.models import (
     DocumentContent,
     PageContent,
 )
+from backend.app.document_parser.text_cleaner import clean_text
 
 
 class PDFDocumentError(Exception):
@@ -81,17 +82,18 @@ def extract_pdf_content(
             if text.strip():
                 has_text = True
 
+            cleaned_result = clean_text(text)
+
             pages.append(
                 PageContent(
                     page_number=page_number,
                     text=text,
+                    cleaned_text=cleaned_result.cleaned_text,
                 )
             )
 
         if not has_text:
-            raise PDFDocumentError(
-                f"PDF 文档没有可提取的文本内容：{path}"
-            )
+            raise PDFDocumentError(f"PDF 文档没有可提取的文本内容：{path}")
 
         return DocumentContent(
             filename=path.name,
