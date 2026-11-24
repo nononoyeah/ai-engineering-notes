@@ -77,3 +77,44 @@ def test_extract_pdf_content_preserves_page_order(tmp_path):
 
     assert result.pages[2].page_number == 3
     assert "Third page" in result.pages[2].text
+
+
+def test_extract_pdf_content_preserves_blank_page(tmp_path):
+    pdf_path = tmp_path / "blank_page.pdf"
+
+    document = pymupdf.open()
+
+    page1 = document.new_page()
+    page1.insert_text((72, 72), "First page")
+
+    document.new_page()  # 第二页保持空白
+
+    page3 = document.new_page()
+    page3.insert_text((72, 72), "Third page")
+
+    document.save(pdf_path)
+    document.close()
+
+    result = extract_pdf_content(pdf_path)
+
+    assert result.total_pages == 3
+    assert len(result.pages) == 3
+    assert result.pages[0].text.strip() == "First page"
+    assert result.pages[1].page_number == 2
+    assert result.pages[1].text.strip() == ""
+    assert result.pages[2].text.strip() == "Third page"
+
+
+def test_extract_pdf_content_rejects_image_only_pdf(tmp_path):
+    pdf_path = tmp_path / "image_only.pdf"
+
+    document = pymupdf.open()
+    document.new_page()
+    document.save(pdf_path)
+    document.close()
+
+    with pytest.raises(
+        PDFDocumentError,
+        match="没有可提取的文本内容",
+    ):
+        extract_pdf_content(pdf_path)

@@ -57,22 +57,32 @@ def extract_pdf_content(
     提取 PDF 全部页面的原始文本。
 
     页码从 1 开始，并保留原始页面顺序。
+    空白页会保留，但全文无有效文本时抛出异常。
     """
     path = Path(pdf_path)
     document = open_pdf_document(path)
 
     try:
         pages = []
+        has_text = False
 
         for page_index in range(document.page_count):
             page = document.load_page(page_index)
             text = page.get_text("text")
+
+            if text.strip():
+                has_text = True
 
             pages.append(
                 PageContent(
                     page_number=page_index + 1,
                     text=text,
                 )
+            )
+
+        if not has_text:
+            raise PDFDocumentError(
+                f"PDF 文档没有可提取的文本内容：{path}"
             )
 
         return DocumentContent(
