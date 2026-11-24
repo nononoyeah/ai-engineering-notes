@@ -1,0 +1,11 @@
+# PDF parser generated output
+/output/*
+!/output/.gitkeep
+
+# Python cache
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Temporary files
+*.tmp
