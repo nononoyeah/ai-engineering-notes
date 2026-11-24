@@ -1,4 +1,6 @@
-import json
+﻿import json
+import os
+import tempfile
 from pathlib import Path
 
 from backend.app.document_parser.models import DocumentContent
@@ -6,6 +8,36 @@ from backend.app.document_parser.models import DocumentContent
 
 class ExportError(Exception):
     """文档导出失败。"""
+
+
+def _write_text_atomically(path: Path, content: str, file_type: str) -> Path:
+    """先写入同目录临时文件，再替换目标文件，避免留下半截目标文件。"""
+    temp_path = None
+
+    try:
+        file_descriptor, temp_name = tempfile.mkstemp(
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            dir=path.parent,
+        )
+        os.close(file_descriptor)
+        temp_path = Path(temp_name)
+
+        with temp_path.open("w", encoding="utf-8") as file:
+            file.write(content)
+
+        os.replace(temp_path, path)
+        return path
+
+    except OSError as exc:
+        if temp_path is not None:
+            try:
+                temp_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+        raise ExportError(
+            f"{file_type} 文件写入失败：{path}，原因：{exc}"
+        ) from exc
 
 
 def export_to_json(
@@ -18,7 +50,6 @@ def export_to_json(
     包含文件名、总页数、逐页原始文本和清洗后文本。
     """
     path = Path(output_path)
-
     data = {
         "filename": document.filename,
         "total_pages": document.total_pages,
@@ -33,13 +64,13 @@ def export_to_json(
     }
 
     try:
-        with path.open("w", encoding="utf-8") as file:
-            json.dump(data, file, ensure_ascii=False, indent=4)
-    except OSError as exc:
-        raise ExportError(f"JSON 文件写入失败：{path}，原因：{exc}") from exc
+        content = json.dumps(data, ensure_ascii=False, indent=4)
+    except (TypeError, ValueError) as exc:
+        raise ExportError(
+            f"JSON 内容序列化失败：{path}，原因：{exc}"
+        ) from exc
 
-    return path
-    return path
+    return _write_text_atomically(path, content, "JSON")
 
 
 def export_to_txt(
@@ -52,23 +83,16 @@ def export_to_txt(
     按照原始页序输出清洗后的文本，并使用页码分隔标记。
     """
     path = Path(output_path)
-
     sections = []
 
     for page in document.pages:
         sections.append(
-            f"========== 第 {page.page_number} 页 ==========\n" f"{page.cleaned_text}"
+            f"========== 第 {page.page_number} 页 ==========\n"
+            f"{page.cleaned_text}"
         )
 
     content = "\n\n".join(sections)
-
-    try:
-        with path.open("w", encoding="utf-8") as file:
-            file.write(content)
-    except OSError as exc:
-        raise ExportError(f"TXT 文件写入失败：{path}，原因：{exc}") from exc
-
-    return path
+    return _write_text_atomically(path, content, "TXT")
 
 
 def export_document(
@@ -85,10 +109,11 @@ def export_document(
     try:
         directory.mkdir(parents=True, exist_ok=True)
     except OSError as exc:
-        raise ExportError(f"输出目录创建失败：{directory}，原因：{exc}") from exc
+        raise ExportError(
+            f"输出目录创建失败：{directory}，原因：{exc}"
+        ) from exc
 
     filename = Path(document.filename).stem
-
     json_path = directory / f"{filename}.json"
     txt_path = directory / f"{filename}.txt"
 
@@ -99,3 +124,4 @@ def export_document(
         "json": json_path,
         "txt": txt_path,
     }
+

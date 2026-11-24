@@ -236,3 +236,40 @@ except ExportError as exc:
 ```
 
 注意：`export_to_json` 和 `export_to_txt` 是底层独立导出接口，不负责自动创建父目录；需要自动创建目录时，建议使用 `export_document`。
+
+
+
+## 10. 统一处理入口
+
+除单独调用 PDF 读取和导出函数外，也可以使用 `pipeline.py` 中的 `process_pdf()` 一次完成整个处理流程。
+
+```python
+from backend.app.document_parser.pipeline import process_pdf
+
+document, output_files = process_pdf(
+    pdf_path="example.pdf",
+    output_dir="output",
+)
+
+print(document.filename)
+print(document.total_pages)
+print(output_files["json"])
+print(output_files["txt"])
+```
+
+`process_pdf()` 的执行顺序：
+
+1. 调用 `extract_pdf_content()` 检查并读取 PDF。
+2. 逐页提取文本，并在解析阶段完成基础文本清洗。
+3. 得到完整的 `DocumentContent`。
+4. 调用 `export_document()` 导出 JSON 和 TXT。
+5. 返回解析结果和两个输出文件路径。
+
+返回值：
+
+- `document`：`DocumentContent` 对象，包含文件名、总页数和逐页原始/清洗文本。
+- `output_files`：字典，包含 `json` 和 `txt` 两个 `Path` 路径。
+
+异常沿用底层模块定义：文件不存在时抛出 `FileNotFoundError`；PDF 无效、读取失败或没有可提取文本时抛出 `PDFDocumentError`；导出失败时抛出 `ExportError`。
+
+统一入口不会吞掉异常，也不会在 PDF 解析失败时启动导出。
