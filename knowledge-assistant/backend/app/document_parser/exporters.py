@@ -4,6 +4,10 @@ from pathlib import Path
 from backend.app.document_parser.models import DocumentContent
 
 
+class ExportError(Exception):
+    """文档导出失败。"""
+
+
 def export_to_json(
     document: DocumentContent,
     output_path: str | Path,
@@ -28,9 +32,13 @@ def export_to_json(
         ],
     }
 
-    with path.open("w", encoding="utf-8") as file:
-        json.dump(data, file, ensure_ascii=False, indent=4)
+    try:
+        with path.open("w", encoding="utf-8") as file:
+            json.dump(data, file, ensure_ascii=False, indent=4)
+    except OSError as exc:
+        raise ExportError(f"JSON 文件写入失败：{path}，原因：{exc}") from exc
 
+    return path
     return path
 
 
@@ -54,8 +62,11 @@ def export_to_txt(
 
     content = "\n\n".join(sections)
 
-    with path.open("w", encoding="utf-8") as file:
-        file.write(content)
+    try:
+        with path.open("w", encoding="utf-8") as file:
+            file.write(content)
+    except OSError as exc:
+        raise ExportError(f"TXT 文件写入失败：{path}，原因：{exc}") from exc
 
     return path
 
@@ -70,7 +81,11 @@ def export_document(
     自动创建输出目录，并根据原始文件名生成输出文件名。
     """
     directory = Path(output_dir)
-    directory.mkdir(parents=True, exist_ok=True)
+
+    try:
+        directory.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        raise ExportError(f"输出目录创建失败：{directory}，原因：{exc}") from exc
 
     filename = Path(document.filename).stem
 
@@ -84,6 +99,3 @@ def export_document(
         "json": json_path,
         "txt": txt_path,
     }
-    
-    
-

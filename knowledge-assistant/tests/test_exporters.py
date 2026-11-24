@@ -1,5 +1,9 @@
 import json
+import pytest
+from pathlib import Path
+from unittest.mock import patch
 
+from backend.app.document_parser.exporters import ExportError
 from backend.app.document_parser.exporters import (
     export_to_json,
     export_to_txt,
@@ -126,3 +130,51 @@ def test_export_document_creates_directory_and_both_files(tmp_path):
     assert json_data["filename"] == "项目资料.pdf"
     assert "第一页清洗内容" in txt_content
     assert "第二页清洗内容" in txt_content
+
+
+def test_export_document_reports_directory_creation_error(tmp_path):
+    document = DocumentContent(
+        filename="测试文档.pdf",
+        total_pages=1,
+        pages=[
+            PageContent(
+                page_number=1,
+                text="测试内容",
+                cleaned_text="测试内容",
+            )
+        ],
+    )
+
+    output_dir = tmp_path / "unavailable"
+
+    with patch.object(
+        Path,
+        "mkdir",
+        side_effect=OSError("模拟目录创建失败"),
+    ):
+        with pytest.raises(ExportError, match="输出目录创建失败"):
+            export_document(document, output_dir)
+
+
+def test_export_to_json_reports_write_error(tmp_path):
+    document = DocumentContent(
+        filename="测试文档.pdf",
+        total_pages=1,
+        pages=[
+            PageContent(
+                page_number=1,
+                text="测试内容",
+                cleaned_text="测试内容",
+            )
+        ],
+    )
+
+    output_path = tmp_path / "测试文档.json"
+
+    with patch.object(
+        Path,
+        "open",
+        side_effect=OSError("模拟文件写入失败"),
+    ):
+        with pytest.raises(ExportError, match="JSON 文件写入失败"):
+            export_to_json(document, output_path)
