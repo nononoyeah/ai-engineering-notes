@@ -40,3 +40,36 @@ def clean_text(text: str) -> CleanedText:
         original_text=original_text,
         cleaned_text=cleaned,
     )
+
+
+def clean_markdown_text(
+    lines: list[str],
+    start: int,
+    end: int,
+    code_lines: set[int],
+) -> str:
+    """
+    清洗 Markdown 文本的空白噪声，保留 Markdown 语法。
+
+    只处理 lines[start:end] 范围内的行，行号以整篇文档为基准。
+    code_lines 中的行属于代码块，原样保留；其余行去除行尾空白，
+    连续空行压缩为一个空行，并去除首尾空白行。
+    """
+    cleaned_lines: list[str] = []
+    pending_blank = False
+
+    for line_number in range(start, end):
+        line = lines[line_number]
+        in_code = line_number in code_lines
+
+        if not in_code and not line.strip():
+            pending_blank = True
+            continue
+
+        if pending_blank:
+            cleaned_lines.append("")
+            pending_blank = False
+
+        cleaned_lines.append(line if in_code else line.rstrip())
+
+    return "\n".join(cleaned_lines).strip("\n")

@@ -48,3 +48,37 @@ def test_document_content_default_pages_are_independent():
 
     assert len(first.pages) == 1
     assert len(second.pages) == 0
+
+
+def test_page_content_heading_fields_default_empty():
+    page = PageContent(page_number=1, text="第一页内容")
+
+    assert page.heading_path == ""
+    assert page.heading_level == 0
+
+
+def test_document_content_defaults_to_pdf_source():
+    document = DocumentContent(filename="example.pdf", total_pages=1)
+
+    assert document.source_type == "pdf"
+
+
+def test_document_content_with_markdown_sections():
+    page = PageContent(
+        page_number=2,
+        text="## 二级标题\n\n正文",
+        cleaned_text="## 二级标题\n\n正文",
+        heading_path="一级标题 > 二级标题",
+        heading_level=2,
+    )
+
+    document = DocumentContent(
+        filename="notes.md",
+        total_pages=2,
+        pages=[page],
+        source_type="markdown",
+    )
+
+    assert document.source_type == "markdown"
+    assert document.pages[0].heading_path == "一级标题 > 二级标题"
+    assert document.pages[0].heading_level == 2

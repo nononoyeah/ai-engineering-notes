@@ -178,3 +178,88 @@ def test_export_to_json_reports_write_error(tmp_path):
     ):
         with pytest.raises(ExportError, match="JSON 文件写入失败"):
             export_to_json(document, output_path)
+
+
+def _markdown_document():
+    return DocumentContent(
+        filename="笔记.md",
+        total_pages=2,
+        source_type="markdown",
+        pages=[
+            PageContent(
+                page_number=1,
+                text="前言内容\n\n",
+                cleaned_text="前言内容",
+            ),
+            PageContent(
+                page_number=2,
+                text="## 部署\n\n正文",
+                cleaned_text="## 部署\n\n正文",
+                heading_path="部署指南 > 部署",
+                heading_level=2,
+            ),
+        ],
+    )
+
+
+def test_export_to_json_includes_source_type_and_headings_for_markdown(tmp_path):
+    document = _markdown_document()
+
+    output_path = tmp_path / "笔记.json"
+    export_to_json(document, output_path)
+
+    data = json.loads(output_path.read_text(encoding="utf-8"))
+    assert data["source_type"] == "markdown"
+    assert data["pages"][0]["heading_path"] == ""
+    assert data["pages"][0]["heading_level"] == 0
+    assert data["pages"][1]["heading_path"] == "部署指南 > 部署"
+    assert data["pages"][1]["heading_level"] == 2
+
+
+def test_export_to_json_marks_pdf_source_type(tmp_path):
+    document = DocumentContent(
+        filename="测试文档.pdf",
+        total_pages=1,
+        pages=[
+            PageContent(page_number=1, text="内容", cleaned_text="内容"),
+        ],
+    )
+
+    output_path = tmp_path / "测试文档.json"
+    export_to_json(document, output_path)
+
+    data = json.loads(output_path.read_text(encoding="utf-8"))
+    assert data["source_type"] == "pdf"
+    assert data["pages"][0]["heading_path"] == ""
+    assert data["pages"][0]["heading_level"] == 0
+
+
+def test_export_to_txt_uses_section_markers_for_markdown(tmp_path):
+    document = _markdown_document()
+
+    output_path = tmp_path / "笔记.txt"
+    export_to_txt(document, output_path)
+
+    content = output_path.read_text(encoding="utf-8")
+    assert "第 1 节  无标题" in content
+    assert "第 2 节  部署指南 > 部署" in content
+    assert content.index("第 1 节") < content.index("第 2 节")
+    assert "前言内容" in content
+    assert "## 部署" in content
+
+
+def test_export_to_txt_keeps_page_marker_for_pdf(tmp_path):
+    document = DocumentContent(
+        filename="测试文档.pdf",
+        total_pages=1,
+        pages=[
+            PageContent(page_number=1, text="内容", cleaned_text="内容"),
+        ],
+    )
+
+    output_path = tmp_path / "测试文档.txt"
+    export_to_txt(document, output_path)
+
+    content = output_path.read_text(encoding="utf-8")
+    assert "第 1 页" in content
+    assert "第 1 节" not in content

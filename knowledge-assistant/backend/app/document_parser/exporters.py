@@ -52,10 +52,13 @@ def export_to_json(
     path = Path(output_path)
     data = {
         "filename": document.filename,
+        "source_type": document.source_type,
         "total_pages": document.total_pages,
         "pages": [
             {
                 "page_number": page.page_number,
+                "heading_path": page.heading_path,
+                "heading_level": page.heading_level,
                 "text": page.text,
                 "cleaned_text": page.cleaned_text,
             }
@@ -86,8 +89,13 @@ def export_to_txt(
     sections = []
 
     for page in document.pages:
+        if document.source_type == "markdown":
+            label = f"第 {page.page_number} 节  {page.heading_path or '无标题'}"
+        else:
+            label = f"第 {page.page_number} 页"
+
         sections.append(
-            f"========== 第 {page.page_number} 页 ==========\n"
+            f"========== {label} ==========\n"
             f"{page.cleaned_text}"
         )
 

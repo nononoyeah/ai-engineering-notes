@@ -1,4 +1,9 @@
-from backend.app.document_parser.text_cleaner import clean_text
+from backend.app.document_parser.text_cleaner import clean_markdown_text, clean_text
+
+
+def _clean_markdown(text, code_lines=()):
+    lines = text.split("\n")
+    return clean_markdown_text(lines, 0, len(lines), set(code_lines))
 
 
 def test_clean_text_removes_leading_and_trailing_whitespace():
@@ -66,3 +71,51 @@ def test_clean_text_preserves_paragraph_and_list_structure():
     result = clean_text(original)
 
     assert result.cleaned_text == original
+
+
+def test_clean_markdown_text_strips_trailing_whitespace():
+    assert _clean_markdown("# 标题   \n\n正文   ") == "# 标题\n\n正文"
+
+
+def test_clean_markdown_text_compresses_blank_lines():
+    assert _clean_markdown("第一段\n\n\n\n第二段") == "第一段\n\n第二段"
+
+
+def test_clean_markdown_text_preserves_code_lines_verbatim():
+    text = '```python\nx = "a    b"\n\n\n    return x\n```'
+
+    assert _clean_markdown(text, code_lines=range(0, 5)) == text
+
+
+def test_clean_markdown_text_keeps_code_trailing_whitespace():
+    text = "```python\nx = 1   \n```"
+    code_lines = {0, 1, 2}
+
+    assert _clean_markdown(text, code_lines) == text
+
+
+def test_clean_markdown_text_cleans_text_around_code():
+    text = "正文   \n\n```python\nx = 1\n\n\n```\n\n\n结尾  "
+    code_lines = {2, 3, 4, 5, 6}
+
+    assert _clean_markdown(text, code_lines) == "正文\n\n```python\nx = 1\n\n\n```\n\n结尾"
+
+
+def test_clean_markdown_text_keeps_list_indentation_and_table_rows():
+    text = "- 一级列表\n    - 二级列表\n\n| 列A | 列B |\n|---|---|\n| 1 | 2 |"
+
+    assert _clean_markdown(text) == text
+
+
+def test_clean_markdown_text_keeps_leading_indentation_of_plain_lines():
+    assert _clean_markdown("    缩进内容\n    第二行") == "    缩进内容\n    第二行"
+
+
+def test_clean_markdown_text_supports_section_range():
+    lines = "# 标题\n\n正文   ".split("\n")
+
+    assert clean_markdown_text(lines, 2, 3, set()) == "正文"
+
+
+def test_clean_markdown_text_drops_blank_section():
+    assert _clean_markdown("\n\n\n") == ""

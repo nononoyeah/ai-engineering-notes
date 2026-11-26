@@ -3,8 +3,13 @@
 import pymupdf
 import pytest
 
-from backend.app.document_parser.pipeline import process_pdf
+from backend.app.document_parser.markdown_parser import MarkdownDocumentError
 from backend.app.document_parser.pdf_parser import PDFDocumentError
+from backend.app.document_parser.pipeline import (
+    UnsupportedFileTypeError,
+    process_document,
+    process_pdf,
+)
 
 
 def create_pdf(path, pages):
@@ -77,6 +82,87 @@ def test_process_pdf_reports_invalid_pdf(tmp_path):
 
     with pytest.raises(PDFDocumentError):
         process_pdf(invalid_pdf, tmp_path / "output")
+
+    assert not (tmp_path / "output").exists()
+
+
+def test_process_document_processes_markdown_end_to_end(tmp_path):
+    md_path = tmp_path / "笔记.md"
+    md_path.write_text(
+        "# 一级标题\n\n前言\n\n## 二级标题\n\n正文   \n\n```python\nx = 1\n```\n",
+        encoding="utf-8",
+    )
+    output_dir = tmp_path / "output"
+
+    document, output_files = process_document(md_path, output_dir)
+
+    assert document.source_type == "markdown"
+    assert document.total_pages == 2
+    assert document.pages[1].heading_path == "一级标题 > 二级标题"
+
+    assert output_files["json"].name == "笔记.json"
+    assert output_files["txt"].name == "笔记.txt"
+
+    json_data = json.loads(output_files["json"].read_text(encoding="utf-8"))
+    txt_content = output_files["txt"].read_text(encoding="utf-8")
+
+    assert json_data["source_type"] == "markdown"
+    assert json_data["pages"][1]["heading_path"] == "一级标题 > 二级标题"
+    assert "第 1 节" in txt_content
+    assert "第 2 节  一级标题 > 二级标题" in txt_content
+    assert "正文" in txt_content
+
+
+def test_process_document_accepts_uppercase_and_markdown_extensions(tmp_path):
+    upper_path = tmp_path / "NOTES.MD"
+    upper_path.write_text("# 标题\n\n正文\n", encoding="utf-8")
+    long_ext_path = tmp_path / "notes.markdown"
+    long_ext_path.write_text("# 标题\n\n正文\n", encoding="utf-8")
+
+    upper_result = process_document(upper_path, tmp_path / "out1")
+    long_ext_result = process_document(long_ext_path, tmp_path / "out2")
+
+    assert upper_result[0].source_type == "markdown"
+    assert long_ext_result[0].source_type == "markdown"
+    assert (tmp_path / "out1" / "NOTES.json").exists()
+    assert (tmp_path / "out2" / "notes.json").exists()
+
+
+def test_process_document_processes_pdf_like_process_pdf(tmp_path):
+    pdf_path = tmp_path / "sample.pdf"
+    create_pdf(pdf_path, ["First page", "Second page"])
+
+    document, output_files = process_document(pdf_path, tmp_path / "output")
+    reference, _ = process_pdf(pdf_path, tmp_path / "reference")
+
+    assert document.source_type == "pdf"
+    assert [page.cleaned_text for page in document.pages] == [
+        page.cleaned_text for page in reference.pages
+    ]
+    assert output_files["json"].exists()
+    assert output_files["txt"].exists()
+
+    txt_content = output_files["txt"].read_text(encoding="utf-8")
+    assert "第 1 页" in txt_content
+    assert "第 2 页" in txt_content
+
+
+def test_process_document_rejects_unsupported_type(tmp_path):
+    txt_path = tmp_path / "资料.txt"
+    txt_path.write_text("内容", encoding="utf-8")
+
+    with pytest.raises(UnsupportedFileTypeError, match="不支持的文件类型"):
+        process_document(txt_path, tmp_path / "output")
+
+    assert not (tmp_path / "output").exists()
+
+
+def test_process_document_does_not_export_when_markdown_parsing_fails(tmp_path):
+    md_path = tmp_path / "blank.md"
+    md_path.write_text(" \n\n", encoding="utf-8")
+
+    with pytest.raises(MarkdownDocumentError, match="没有可提取的文本内容"):
+        process_document(md_path, tmp_path / "output")
 
     assert not (tmp_path / "output").exists()
 
